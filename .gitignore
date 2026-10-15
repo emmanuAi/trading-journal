@@ -36,6 +36,13 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local persistence (SQLite DB + uploaded screenshots) — never commit real trade data
+/data/
+/storage/
+
+# local backups made by scripts/migrate-to-supabase.ts before migrating
+/backups/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
