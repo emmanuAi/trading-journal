@@ -18,6 +18,7 @@ import type {
   PostTradeNotes,
 } from "../types";
 import { listScreenshotsForTrade, listScreenshotsForTrades } from "./screenshots";
+import { getAccount } from "./accounts";
 
 interface TradeRow {
   id: string;
@@ -203,6 +204,14 @@ export async function createTrade(input: TradeInput): Promise<Trade> {
   const supabase = await createClient();
   const user = await requireUser(supabase);
 
+  // accountId is client-supplied; the accounts FK alone doesn't prove it's
+  // *this* caller's account (any existing account id would satisfy it), and
+  // account ids are UUIDs so this isn't realistically guessable — but verify
+  // explicitly rather than lean on that. getAccount() is itself owner-scoped.
+  if (!(await getAccount(input.accountId))) {
+    throw new Error("Account not found.");
+  }
+
   const { data: idData, error: idError } = await supabase.rpc("next_trade_id");
   if (idError) throw idError;
   const id = idData as string;
@@ -229,6 +238,10 @@ export async function updateTrade(id: string, input: TradeInput): Promise<Trade 
     .maybeSingle();
   if (existingError) throw existingError;
   if (!existing) return null;
+
+  if (!(await getAccount(input.accountId))) {
+    throw new Error("Account not found.");
+  }
 
   const now = new Date().toISOString();
   const derived = deriveFields(input);

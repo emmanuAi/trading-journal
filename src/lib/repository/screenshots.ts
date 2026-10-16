@@ -41,6 +41,20 @@ export async function saveScreenshot(tradeId: string, phase: Screenshot["phase"]
   const supabase = await createClient();
   const user = await requireUser(supabase);
 
+  // tradeId is caller-supplied; the route that calls this already verifies
+  // ownership via getTrade(), but check again here too (a raw query, not an
+  // import of trades.ts, to avoid a circular dependency) so this function is
+  // safe to call from anywhere in the future without relying on callers to
+  // remember the pre-check.
+  const { data: trade, error: tradeError } = await supabase
+    .from("trades")
+    .select("id")
+    .eq("id", tradeId)
+    .eq("owner", user.id)
+    .maybeSingle();
+  if (tradeError) throw tradeError;
+  if (!trade) throw new Error("Trade not found.");
+
   const storagePath = `${user.id}/${tradeId}/${randomUUID()}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
