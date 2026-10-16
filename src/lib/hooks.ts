@@ -1,7 +1,13 @@
 "use client";
-import * as React from "react";
+import useSWR from "swr";
 import type { Trade, Settings } from "./types";
 import { useAccountContext } from "@/components/layout/account-context";
+
+export async function fetcher(url: string) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Failed to load data.");
+  return res.json();
+}
 
 export interface TradeQuery {
   dateFrom?: string;
@@ -26,64 +32,44 @@ function buildQuery(params: Record<string, string | undefined | boolean>): strin
   return sp.toString();
 }
 
+/** Cached per unique (account, filters) combination via SWR — navigating away
+ * and back to a page using the same query shows the cached result instantly
+ * while a revalidation request runs in the background, instead of always
+ * re-fetching from a blank slate. revalidateOnFocus is off since trading
+ * data doesn't need a refetch every time the browser tab regains focus. */
 export function useTrades(filters: TradeQuery = {}) {
   const { activeAccountId, aggregated, loading: accountLoading } = useAccountContext();
-  const [trades, setTrades] = React.useState<Trade[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
   const filterKey = JSON.stringify(filters);
 
-  const refresh = React.useCallback(async () => {
-    if (accountLoading) return;
-    if (!aggregated && !activeAccountId) {
-      setTrades([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const query = buildQuery({
+  const ready = !accountLoading && (aggregated || !!activeAccountId);
+  const key = ready
+    ? `/api/trades?${buildQuery({
         accountId: activeAccountId ?? undefined,
         aggregated,
         ...(JSON.parse(filterKey) as Record<string, string | boolean | undefined>),
-      });
-      const res = await fetch(`/api/trades?${query}`);
-      if (!res.ok) throw new Error("Failed to load trades.");
-      const data = await res.json();
-      setTrades(data.trades);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load trades.");
-    } finally {
-      setLoading(false);
-    }
-  }, [activeAccountId, aggregated, accountLoading, filterKey]);
+      })}`
+    : null;
 
-  React.useEffect(() => {
-    // Fetch-on-mount/dep-change: refresh() is the external data sync, not a derived value.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    refresh();
-  }, [refresh]);
+  const { data, error, isLoading, mutate } = useSWR<{ trades: Trade[] }>(key, fetcher, {
+    revalidateOnFocus: false,
+  });
 
-  return { trades, loading, error, refresh };
+  return {
+    trades: data?.trades ?? [],
+    loading: accountLoading || (key !== null && isLoading),
+    error: error ? (error instanceof Error ? error.message : "Failed to load trades.") : null,
+    refresh: () => mutate(),
+  };
 }
 
 export function useSettings() {
-  const [settings, setSettings] = React.useState<Settings | null>(null);
-  const [loading, setLoading] = React.useState(true);
+  const { data, isLoading, mutate } = useSWR<{ settings: Settings }>("/api/settings", fetcher, {
+    revalidateOnFocus: false,
+  });
 
-  const refresh = React.useCallback(async () => {
-    setLoading(true);
-    const res = await fetch("/api/settings");
-    const data = await res.json();
-    setSettings(data.settings);
-    setLoading(false);
-  }, []);
-
-  React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    refresh();
-  }, [refresh]);
-
-  return { settings, loading, refresh };
+  return {
+    settings: data?.settings ?? null,
+    loading: isLoading,
+    refresh: () => mutate(),
+  };
 }

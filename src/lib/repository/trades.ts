@@ -44,6 +44,7 @@ interface TradeRow {
   realized_pnl: number | null;
   planned_rr: number | null;
   actual_r: number | null;
+  max_drawdown_pips: number | null;
   strategy: string | null;
   setup_grade: string | null;
   followed_plan: boolean;
@@ -81,6 +82,7 @@ function rowToTrade(row: TradeRow): Trade {
     realizedPnl: row.realized_pnl,
     plannedRR: row.planned_rr,
     actualR: row.actual_r,
+    maxDrawdownPips: row.max_drawdown_pips,
     strategy: row.strategy,
     setupGrade: row.setup_grade as SetupGrade,
     followedPlan: row.followed_plan,
@@ -118,6 +120,7 @@ export interface TradeInput {
   realizedPnl?: number | null;
   plannedRR?: number | null;
   actualR?: number | null;
+  maxDrawdownPips?: number | null;
   strategy?: string | null;
   setupGrade?: SetupGrade;
   followedPlan?: boolean;
@@ -187,6 +190,7 @@ function toRow(id: string, owner: string, input: TradeInput, derived: ReturnType
     realized_pnl: derived.realizedPnl,
     planned_rr: derived.plannedRR,
     actual_r: derived.actualR,
+    max_drawdown_pips: input.maxDrawdownPips ?? null,
     strategy: input.strategy ?? null,
     setup_grade: input.setupGrade ?? null,
     followed_plan: input.followedPlan !== false,

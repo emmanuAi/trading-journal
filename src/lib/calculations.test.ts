@@ -41,6 +41,7 @@ function makeTrade(overrides: Partial<Trade>): Trade {
     realizedPnl: 100,
     plannedRR: 2,
     actualR: 1,
+    maxDrawdownPips: null,
     strategy: "Breakout",
     setupGrade: "A",
     followedPlan: true,

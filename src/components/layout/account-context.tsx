@@ -1,6 +1,8 @@
 "use client";
 import * as React from "react";
+import useSWR from "swr";
 import type { Account } from "@/lib/types";
+import { fetcher } from "@/lib/hooks";
 
 interface AccountContextValue {
   accounts: Account[];
@@ -8,7 +10,7 @@ interface AccountContextValue {
   aggregated: boolean;
   setActiveAccountId: (id: string) => void;
   setAggregated: (v: boolean) => void;
-  refreshAccounts: () => Promise<void>;
+  refreshAccounts: () => Promise<Account[]>;
   loading: boolean;
 }
 
@@ -18,30 +20,35 @@ const STORAGE_KEY = "tj_active_account";
 const AGG_KEY = "tj_aggregated_view";
 
 export function AccountProvider({ children }: { children: React.ReactNode }) {
-  const [accounts, setAccounts] = React.useState<Account[]>([]);
+  // revalidateOnFocus: false — this list rarely changes mid-session and we
+  // don't want an extra request every time the browser tab regains focus.
+  // Cached between page navigations, so returning to a page that needs the
+  // account list no longer re-fetches from scratch.
+  const { data, isLoading, mutate } = useSWR<{ accounts: Account[] }>("/api/accounts", fetcher, {
+    revalidateOnFocus: false,
+  });
+  const accounts = React.useMemo(() => data?.accounts ?? [], [data]);
+
   const [activeAccountId, setActiveAccountIdState] = React.useState<string | null>(null);
   const [aggregated, setAggregatedState] = React.useState(false);
-  const [loading, setLoading] = React.useState(true);
-
-  const refreshAccounts = React.useCallback(async () => {
-    const res = await fetch("/api/accounts");
-    const data = await res.json();
-    setAccounts(data.accounts ?? []);
-    return data.accounts ?? [];
-  }, []);
+  const [initialized, setInitialized] = React.useState(false);
 
   React.useEffect(() => {
-    (async () => {
-      const list: Account[] = await refreshAccounts();
-      const stored = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
-      const storedAgg = typeof window !== "undefined" ? window.localStorage.getItem(AGG_KEY) === "1" : false;
-      const valid = list.find((a) => a.id === stored);
-      const fallback = list.find((a) => a.isDefault) ?? list[0];
-      setActiveAccountIdState(valid ? valid.id : fallback ? fallback.id : null);
-      setAggregatedState(storedAgg);
-      setLoading(false);
-    })();
-  }, [refreshAccounts]);
+    if (isLoading || initialized) return;
+    const stored = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
+    const storedAgg = typeof window !== "undefined" ? window.localStorage.getItem(AGG_KEY) === "1" : false;
+    const valid = accounts.find((a) => a.id === stored);
+    const fallback = accounts.find((a) => a.isDefault) ?? accounts[0];
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time init from localStorage + the first resolved account list, not a derived render value.
+    setActiveAccountIdState(valid ? valid.id : fallback ? fallback.id : null);
+    setAggregatedState(storedAgg);
+    setInitialized(true);
+  }, [isLoading, accounts, initialized]);
+
+  const refreshAccounts = React.useCallback(async () => {
+    const result = await mutate();
+    return result?.accounts ?? [];
+  }, [mutate]);
 
   const setActiveAccountId = (id: string) => {
     setActiveAccountIdState(id);
@@ -55,7 +62,15 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AccountContext.Provider
-      value={{ accounts, activeAccountId, aggregated, setActiveAccountId, setAggregated, refreshAccounts, loading }}
+      value={{
+        accounts,
+        activeAccountId,
+        aggregated,
+        setActiveAccountId,
+        setAggregated,
+        refreshAccounts,
+        loading: isLoading || !initialized,
+      }}
     >
       {children}
     </AccountContext.Provider>

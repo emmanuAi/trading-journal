@@ -27,8 +27,14 @@ import {
   calendarDailyPnl,
   returnPercent,
   netPnl,
+  pipStatistics,
 } from "@/lib/calculations";
 import { formatCurrency, formatPercent, formatR, formatNumber } from "@/lib/utils";
+
+function formatPips(v: number | null, digits = 1) {
+  if (v === null) return "—";
+  return `${v >= 0 ? "+" : ""}${v.toFixed(digits)} pips`;
+}
 
 const DAY_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -57,6 +63,7 @@ export default function AnalyticsPage() {
   const dailyPnl = calendarDailyPnl(trades);
   const retPct = returnPercent(trades, startingBalance);
   const pnl = netPnl(trades);
+  const pips = pipStatistics(trades);
 
   const monthlyLabel = (key: string) => {
     const [y, m] = key.split("-");
@@ -153,6 +160,35 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <DrawdownChart points={drawdownPoints} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-foreground text-base font-semibold">Pip Statistics</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Realized pips, normalized per instrument&apos;s own pip size — separate from monetary P&amp;L.
+              {pips.tradesMissingPips > 0 &&
+                ` ${pips.tradesMissingPips} closed trade${pips.tradesMissingPips === 1 ? "" : "s"} excluded (instrument has no known pip size).`}
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              <KpiCard
+                label="Total Net Pips"
+                value={formatPips(pips.totalNetPips)}
+                tone={pips.totalNetPips === null ? "neutral" : pips.totalNetPips >= 0 ? "profit" : "loss"}
+              />
+              <KpiCard
+                label="Avg Pips / Trade"
+                value={formatPips(pips.avgPipsPerTrade)}
+                tone={pips.avgPipsPerTrade === null ? "neutral" : pips.avgPipsPerTrade >= 0 ? "profit" : "loss"}
+              />
+              <KpiCard label="Avg Winning Trade" value={formatPips(pips.avgWinningPips)} tone={pips.avgWinningPips === null ? "neutral" : "profit"} />
+              <KpiCard label="Avg Losing Trade" value={formatPips(pips.avgLosingPips)} tone={pips.avgLosingPips === null ? "neutral" : "loss"} />
+              <KpiCard label="Avg Max Drawdown" value={pips.avgMaxDrawdownPips !== null ? `${pips.avgMaxDrawdownPips.toFixed(1)} pips` : "No data yet"} />
+              <KpiCard label="Largest Max Drawdown" value={pips.largestMaxDrawdownPips !== null ? `${pips.largestMaxDrawdownPips.toFixed(1)} pips` : "No data yet"} />
+            </div>
           </CardContent>
         </Card>
 

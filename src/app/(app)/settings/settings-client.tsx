@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { toast } from "sonner";
-import { Plus, X, Trash2, Download, Star } from "lucide-react";
+import { Plus, X, Trash2, Download, Star, Pencil } from "lucide-react";
 import { Topbar } from "@/components/layout/topbar";
 import { useAccountContext } from "@/components/layout/account-context";
 import { useSettings } from "@/lib/hooks";
@@ -30,6 +30,9 @@ export function SettingsClient({ initialFirstName, initialLastName }: { initialF
   const [accountDialogOpen, setAccountDialogOpen] = React.useState(false);
   const [clearDemoOpen, setClearDemoOpen] = React.useState(false);
   const [newAccount, setNewAccount] = React.useState({ name: "", type: "personal" as AccountType, baseCurrency: "EUR", startingBalance: "10000" });
+  const [editAccountId, setEditAccountId] = React.useState<string | null>(null);
+  const [editAccount, setEditAccount] = React.useState({ name: "", type: "personal" as AccountType, baseCurrency: "EUR", startingBalance: "" });
+  const [savingEditAccount, setSavingEditAccount] = React.useState(false);
 
   React.useEffect(() => {
     if (settings && !form) {
@@ -129,6 +132,40 @@ export function SettingsClient({ initialFirstName, initialLastName }: { initialF
     refreshAccounts();
   }
 
+  function openEditAccount(id: string) {
+    const a = accounts.find((acc) => acc.id === id);
+    if (!a) return;
+    setEditAccount({ name: a.name, type: a.type, baseCurrency: a.baseCurrency, startingBalance: String(a.startingBalance) });
+    setEditAccountId(id);
+  }
+
+  async function saveEditAccount() {
+    if (!editAccountId) return;
+    if (!editAccount.name.trim()) {
+      toast.error("Account name is required.");
+      return;
+    }
+    const balance = Number(editAccount.startingBalance);
+    if (!Number.isFinite(balance) || balance < 0) {
+      toast.error("Starting balance must be a valid, non-negative number.");
+      return;
+    }
+    setSavingEditAccount(true);
+    const res = await fetch(`/api/accounts/${editAccountId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...editAccount, startingBalance: balance }),
+    });
+    setSavingEditAccount(false);
+    if (!res.ok) {
+      toast.error("Failed to update account.");
+      return;
+    }
+    toast.success("Account updated. Historical trades keep their own recorded balances.");
+    setEditAccountId(null);
+    refreshAccounts();
+  }
+
   async function deleteAccount(id: string) {
     if (accounts.length <= 1) {
       toast.error("You need at least one account.");
@@ -206,6 +243,9 @@ export function SettingsClient({ initialFirstName, initialLastName }: { initialF
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
+                  <button onClick={() => openEditAccount(a.id)} className="rounded-md p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-accent" title="Edit account">
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
                   {!a.isDefault && (
                     <button onClick={() => setDefaultAccount(a.id)} className="rounded-md p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-accent" title="Set as default">
                       <Star className="h-3.5 w-3.5" />
@@ -413,6 +453,69 @@ export function SettingsClient({ initialFirstName, initialLastName }: { initialF
               <Button variant="outline">Cancel</Button>
             </DialogClose>
             <Button onClick={createAccount}>Create Account</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editAccountId !== null} onOpenChange={(open) => !open && setEditAccountId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Account</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label>Name</Label>
+              <Input value={editAccount.name} onChange={(e) => setEditAccount({ ...editAccount, name: e.target.value })} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>Type</Label>
+              <Select value={editAccount.type} onValueChange={(v) => setEditAccount({ ...editAccount, type: v as AccountType })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="personal">Personal</SelectItem>
+                  <SelectItem value="prop_firm">Prop Firm</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label>Base Currency</Label>
+                <Select value={editAccount.baseCurrency} onValueChange={(v) => setEditAccount({ ...editAccount, baseCurrency: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="GBP">GBP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>Starting Balance</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={editAccount.startingBalance}
+                  onChange={(e) => setEditAccount({ ...editAccount, startingBalance: e.target.value })}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Changing the starting balance updates this account&apos;s current balance (starting balance + realized P&amp;L) going
+              forward. Your existing trades and their recorded account-balance-at-entry values are never changed.
+            </p>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button onClick={saveEditAccount} disabled={savingEditAccount}>
+              {savingEditAccount ? "Saving…" : "Save Changes"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

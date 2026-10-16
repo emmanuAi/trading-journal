@@ -16,7 +16,7 @@ import { ScreenshotSection } from "@/components/trade-form/screenshot-uploader";
 import { TradeForm, tradeToFormValues, tradeFormValuesToInput, type TradeFormValues } from "@/components/trade-form/trade-form";
 import type { Trade } from "@/lib/types";
 import { formatCurrency, formatR, formatNumber } from "@/lib/utils";
-import { holdingDurationHours } from "@/lib/calculations";
+import { holdingDurationHours, calcRealizedPips } from "@/lib/calculations";
 
 export default function TradeDetailPage() {
   const params = useParams<{ id: string }>();
@@ -178,6 +178,17 @@ export default function TradeDetailPage() {
                     <DetailRow label="Exit Time" value={trade.exitTime ? new Date(trade.exitTime).toLocaleString() : "—"} />
                     <DetailRow label="Entry Price" value={String(trade.entryPrice)} />
                     <DetailRow label="Exit Price" value={trade.exitPrice != null ? String(trade.exitPrice) : "—"} />
+                    <DetailRow
+                      label="Realized Pips"
+                      value={(() => {
+                        const pips = calcRealizedPips(trade);
+                        return pips !== null ? `${pips >= 0 ? "+" : ""}${pips.toFixed(1)} pips` : "—";
+                      })()}
+                    />
+                    <DetailRow
+                      label="Maximum Drawdown (Pips)"
+                      value={trade.maxDrawdownPips != null ? `${trade.maxDrawdownPips.toFixed(1)} pips` : "—"}
+                    />
                     <DetailRow label="Stop Loss" value={trade.stopLoss != null ? String(trade.stopLoss) : "—"} />
                     <DetailRow label="Take Profit" value={trade.takeProfit != null ? String(trade.takeProfit) : "—"} />
                     <DetailRow label="Position Size" value={String(trade.positionSize)} />

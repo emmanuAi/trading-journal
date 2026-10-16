@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { EmotionTagPicker } from "./emotion-tag-picker";
 import { INSTRUMENTS } from "@/lib/instruments";
-import { calcPlannedRR, calcGrossPnl, calcNetPnl, calcRiskAmount, calcActualR, determineResult } from "@/lib/calculations";
+import { calcPlannedRR, calcGrossPnl, calcNetPnl, calcRiskAmount, calcActualR, determineResult, calcPipsFromPrices } from "@/lib/calculations";
 import { cn, formatCurrency, formatR } from "@/lib/utils";
 import type { Direction, SetupGrade, Trade, TradeStatus } from "@/lib/types";
 
@@ -35,6 +35,7 @@ export interface TradeFormValues {
   realizedPnl: string;
   plannedRR: string;
   actualR: string;
+  maxDrawdownPips: string;
   strategy: string;
   setupGrade: SetupGrade;
   followedPlan: boolean;
@@ -80,6 +81,7 @@ export function defaultTradeFormValues(defaults: { accountBalance: number; riskP
     realizedPnl: "",
     plannedRR: "",
     actualR: "",
+    maxDrawdownPips: "",
     strategy: "",
     setupGrade: null,
     followedPlan: true,
@@ -112,6 +114,7 @@ export function tradeToFormValues(trade: Trade): TradeFormValues {
     realizedPnl: trade.realizedPnl != null ? String(trade.realizedPnl) : "",
     plannedRR: trade.plannedRR != null ? String(trade.plannedRR) : "",
     actualR: trade.actualR != null ? String(trade.actualR) : "",
+    maxDrawdownPips: trade.maxDrawdownPips != null ? String(trade.maxDrawdownPips) : "",
     strategy: trade.strategy ?? "",
     setupGrade: trade.setupGrade,
     followedPlan: trade.followedPlan,
@@ -148,6 +151,7 @@ export function tradeFormValuesToInput(values: TradeFormValues, accountId: strin
     realizedPnl: num(values.realizedPnl),
     plannedRR: num(values.plannedRR),
     actualR: num(values.actualR),
+    maxDrawdownPips: num(values.maxDrawdownPips),
     strategy: values.strategy || null,
     setupGrade: values.setupGrade,
     followedPlan: values.followedPlan,
@@ -194,10 +198,19 @@ export function TradeForm({
   const computedRR = calcPlannedRR(entryPrice, stopLoss, takeProfit);
   const computedRiskAmount = calcRiskAmount(accountBalance, riskPercent);
   const computedGrossPnl = entryPrice != null && exitPrice != null ? calcGrossPnl(entryPrice, exitPrice, positionSize, values.direction) : null;
+  const computedRealizedPips = calcPipsFromPrices(entryPrice, exitPrice, values.direction, values.instrument);
   const computedNetPnl = computedGrossPnl != null ? calcNetPnl(computedGrossPnl, fees, commission, swap) : null;
   const effectiveRiskAmount = dirty.riskAmount ? num(values.riskAmount) : computedRiskAmount;
   const computedActualR = calcActualR(computedNetPnl, effectiveRiskAmount);
   const computedResult = determineResult(computedNetPnl);
+
+  function update(patch: Partial<TradeFormValues>) {
+    onChange({ ...values, ...patch });
+  }
+
+  function updateNested<K extends "preTrade" | "duringTrade" | "postTrade">(key: K, patch: Partial<TradeFormValues[K]>) {
+    onChange({ ...values, [key]: { ...values[key], ...patch } });
+  }
 
   React.useEffect(() => {
     if (!dirty.riskAmount && computedRiskAmount != null) {
@@ -226,14 +239,6 @@ export function TradeForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [values.realizedPnl, values.riskAmount]);
-
-  function update(patch: Partial<TradeFormValues>) {
-    onChange({ ...values, ...patch });
-  }
-
-  function updateNested<K extends "preTrade" | "duringTrade" | "postTrade">(key: K, patch: Partial<TradeFormValues[K]>) {
-    onChange({ ...values, [key]: { ...values[key], ...patch } });
-  }
 
   const checklistComplete = checklist.plan && checklist.risk && checklist.emotion;
 
@@ -319,6 +324,28 @@ export function TradeForm({
             </Field>
             <Field label="Exit Price">
               <Input type="number" step="any" value={values.exitPrice} onChange={(e) => update({ exitPrice: e.target.value })} />
+            </Field>
+            <Field label="Realized Pips" hint="auto">
+              <div className="flex h-9 items-center rounded-lg border border-border bg-surface-2 px-3 text-sm text-muted-foreground">
+                {computedRealizedPips !== null ? (
+                  <span className={computedRealizedPips >= 0 ? "text-profit font-medium" : "text-loss font-medium"}>
+                    {computedRealizedPips >= 0 ? "+" : ""}
+                    {computedRealizedPips.toFixed(1)} pips
+                  </span>
+                ) : (
+                  "—"
+                )}
+              </div>
+            </Field>
+            <Field label="Maximum Drawdown (Pips)" hint="optional">
+              <Input
+                type="number"
+                step="any"
+                min="0"
+                value={values.maxDrawdownPips}
+                onChange={(e) => update({ maxDrawdownPips: e.target.value })}
+                placeholder="e.g. 12"
+              />
             </Field>
             <Field label="Position Size / Lots">
               <Input type="number" step="any" value={values.positionSize} onChange={(e) => update({ positionSize: e.target.value })} required />

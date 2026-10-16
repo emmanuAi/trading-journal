@@ -40,6 +40,7 @@ create table trades (
   realized_pnl numeric,
   planned_rr numeric,
   actual_r numeric,
+  max_drawdown_pips numeric, -- manually entered maximum adverse excursion, in pips (or the instrument's natural unit)
   strategy text,
   setup_grade text check (setup_grade in ('A+', 'A', 'B', 'C')),
   followed_plan boolean not null default true,

@@ -1,4 +1,5 @@
 import type { Direction, Trade } from "./types";
+import { findInstrument } from "./instruments";
 
 /** Planned risk-to-reward ratio from entry/stop/target. Null when inputs are missing or risk is zero. */
 export function calcPlannedRR(
@@ -348,4 +349,69 @@ export function calendarDailyPnl(trades: Trade[]): Map<string, CalendarDay> {
     map.set(date, existing);
   }
   return map;
+}
+
+/** Price movement in pips (or the instrument's natural unit, e.g. points for
+ * an index) between an entry and exit price. Null — never 0 — when either
+ * price is missing or the instrument isn't one with a known pip size (a
+ * custom/typed-in symbol not in the instrument list). Used both live in the
+ * trade form (before a trade is saved) and for stored trades. */
+export function calcPipsFromPrices(
+  entryPrice: number | null,
+  exitPrice: number | null,
+  direction: Direction,
+  instrumentSymbol: string
+): number | null {
+  if (entryPrice == null || exitPrice == null) return null;
+  const instrument = findInstrument(instrumentSymbol);
+  if (!instrument || instrument.pipSize <= 0) return null;
+  const diff = direction === "long" ? exitPrice - entryPrice : entryPrice - exitPrice;
+  return diff / instrument.pipSize;
+}
+
+/** Realized pips for one closed trade — null (never 0) when the trade isn't
+ * closed or either price is missing/unmatched. See calcPipsFromPrices. */
+export function calcRealizedPips(trade: Trade): number | null {
+  if (trade.status !== "closed") return null;
+  return calcPipsFromPrices(trade.entryPrice, trade.exitPrice, trade.direction, trade.instrument);
+}
+
+export interface PipStatistics {
+  totalNetPips: number | null;
+  avgPipsPerTrade: number | null;
+  avgWinningPips: number | null;
+  avgLosingPips: number | null;
+  avgMaxDrawdownPips: number | null;
+  largestMaxDrawdownPips: number | null;
+  /** Closed trades where realized pips could be computed. */
+  tradesWithPips: number;
+  /** Closed trades excluded because the instrument has no known pip size. */
+  tradesMissingPips: number;
+}
+
+/** Aggregates realized-pip performance across closed trades. Every average
+ * is computed only over trades where a real value is known — missing data
+ * is excluded from the denominator, never counted as 0, so one untracked
+ * trade can't silently drag down (or inflate) an average. */
+export function pipStatistics(trades: Trade[]): PipStatistics {
+  const closed = trades.filter(isClosed);
+  const withPips = closed.map((t) => ({ trade: t, pips: calcRealizedPips(t) }));
+  const known = withPips.filter((x): x is { trade: Trade; pips: number } => x.pips !== null);
+  const wins = known.filter((x) => x.pips > 0);
+  const losses = known.filter((x) => x.pips < 0);
+
+  const sum = (xs: { pips: number }[]) => xs.reduce((s, x) => s + x.pips, 0);
+
+  const ddValues = closed.map((t) => t.maxDrawdownPips).filter((v): v is number => v != null);
+
+  return {
+    totalNetPips: known.length > 0 ? sum(known) : null,
+    avgPipsPerTrade: known.length > 0 ? sum(known) / known.length : null,
+    avgWinningPips: wins.length > 0 ? sum(wins) / wins.length : null,
+    avgLosingPips: losses.length > 0 ? sum(losses) / losses.length : null,
+    avgMaxDrawdownPips: ddValues.length > 0 ? ddValues.reduce((s, v) => s + v, 0) / ddValues.length : null,
+    largestMaxDrawdownPips: ddValues.length > 0 ? Math.max(...ddValues) : null,
+    tradesWithPips: known.length,
+    tradesMissingPips: closed.length - known.length,
+  };
 }

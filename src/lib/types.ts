@@ -84,6 +84,10 @@ export interface Trade {
   realizedPnl: number | null;
   plannedRR: number | null;
   actualR: number | null;
+  /** Maximum adverse excursion — the worst the trade moved against the
+   * position before its final result, in pips (or the instrument's natural
+   * unit). Manually entered; null means not recorded, never 0. */
+  maxDrawdownPips: number | null;
   strategy: string | null;
   setupGrade: SetupGrade;
   followedPlan: boolean;
