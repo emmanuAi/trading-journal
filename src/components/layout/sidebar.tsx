@@ -65,10 +65,10 @@ export function Sidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex lg:w-60 lg:flex-col lg:border-r lg:border-border lg:bg-surface lg:fixed lg:inset-y-0">
+      <aside className="hidden lg:flex lg:w-60 lg:flex-col lg:border-r lg:border-border lg:bg-sidebar lg:fixed lg:inset-y-0">
         <div className="flex items-center gap-2 px-5 py-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15">
-            <TrendingUp className="h-4 w-4 text-accent" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent/50 shadow-[0_0_16px_-4px_var(--accent)]">
+            <TrendingUp className="h-4 w-4 text-white" />
           </div>
           <span className="text-sm font-semibold">Trading Journal</span>
         </div>
@@ -87,10 +87,10 @@ export function Sidebar() {
       </aside>
 
       {/* Mobile top bar + drawer */}
-      <div className="lg:hidden flex items-center justify-between border-b border-border bg-surface px-4 py-3 sticky top-0 z-40">
+      <div className="lg:hidden flex items-center justify-between border-b border-border bg-sidebar px-4 py-3 sticky top-0 z-40">
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/15">
-            <TrendingUp className="h-4 w-4 text-accent" />
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent/50 shadow-[0_0_16px_-4px_var(--accent)]">
+            <TrendingUp className="h-4 w-4 text-white" />
           </div>
           <span className="text-sm font-semibold">Trading Journal</span>
         </div>
@@ -102,7 +102,7 @@ export function Sidebar() {
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="fixed inset-0 bg-black/70" onClick={() => setMobileOpen(false)} />
-          <div className="relative z-10 flex w-64 flex-col bg-surface border-r border-border animate-fade-in">
+          <div className="relative z-10 flex w-64 flex-col bg-sidebar border-r border-border animate-fade-in">
             <div className="flex items-center justify-between px-5 py-5">
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15">

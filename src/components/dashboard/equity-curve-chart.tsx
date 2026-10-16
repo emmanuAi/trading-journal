@@ -14,8 +14,8 @@ import type { EquityPoint } from "@/lib/calculations";
 import { formatCurrency, formatR } from "@/lib/utils";
 import { format } from "date-fns";
 
-const PROFIT = "#22c55e";
-const LOSS = "#ef4444";
+const PROFIT = "#22C55E";
+const LOSS = "#FF253E";
 
 function buildSplitGradientStops(values: number[], baseline: number) {
   const n = values.length;
@@ -75,23 +75,23 @@ export function EquityCurveChart({
             ))}
           </linearGradient>
           <linearGradient id={`${gradientId}-fill`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.15} />
-            <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+            <stop offset="5%" stopColor="#267BFF" stopOpacity={0.2} />
+            <stop offset="95%" stopColor="#267BFF" stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#26262a" vertical={false} />
-        <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#71717a" }} axisLine={false} tickLine={false} minTickGap={40} />
+        <CartesianGrid strokeDasharray="3 3" stroke="#1D3048" vertical={false} />
+        <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#9AAFC8" }} axisLine={false} tickLine={false} minTickGap={40} />
         <YAxis
-          tick={{ fontSize: 11, fill: "#71717a" }}
+          tick={{ fontSize: 11, fill: "#9AAFC8" }}
           axisLine={false}
           tickLine={false}
           width={60}
           tickFormatter={(v) => (mode === "balance" ? formatCurrency(v, currency).replace(/\.00$/, "") : `${v.toFixed(1)}R`)}
         />
-        <ReferenceLine y={baseline} stroke="#52525b" strokeDasharray="4 4" />
+        <ReferenceLine y={baseline} stroke="#3A4F6E" strokeDasharray="4 4" />
         <Tooltip
-          contentStyle={{ background: "#18181b", border: "1px solid #26262a", borderRadius: 8, fontSize: 12 }}
-          labelStyle={{ color: "#f4f4f5" }}
+          contentStyle={{ background: "#0B1B30", border: "1px solid #1D3048", borderRadius: 8, fontSize: 12 }}
+          labelStyle={{ color: "#F8FAFF" }}
           formatter={(value) => [
             mode === "balance" ? formatCurrency(Number(value), currency) : formatR(Number(value)),
             mode === "balance" ? "Balance" : "Cumulative R",

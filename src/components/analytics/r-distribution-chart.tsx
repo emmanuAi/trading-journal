@@ -25,13 +25,13 @@ export function RDistributionChart({ trades }: { trades: Trade[] }) {
   return (
     <ResponsiveContainer width="100%" height={240}>
       <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#26262a" vertical={false} />
-        <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#71717a" }} axisLine={false} tickLine={false} interval={0} angle={-30} textAnchor="end" height={50} />
-        <YAxis tick={{ fontSize: 11, fill: "#71717a" }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
-        <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #26262a", borderRadius: 8, fontSize: 12 }} labelStyle={{ color: "#f4f4f5" }} formatter={(v) => [`${v} trades`, ""]} />
+        <CartesianGrid strokeDasharray="3 3" stroke="#1D3048" vertical={false} />
+        <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#9AAFC8" }} axisLine={false} tickLine={false} interval={0} angle={-30} textAnchor="end" height={50} />
+        <YAxis tick={{ fontSize: 11, fill: "#9AAFC8" }} axisLine={false} tickLine={false} width={30} allowDecimals={false} />
+        <Tooltip contentStyle={{ background: "#0B1B30", border: "1px solid #1D3048", borderRadius: 8, fontSize: 12 }} labelStyle={{ color: "#F8FAFF" }} formatter={(v) => [`${v} trades`, ""]} />
         <Bar dataKey="count" radius={[4, 4, 0, 0]}>
           {data.map((d, i) => (
-            <Cell key={i} fill={d.negative ? "#ef4444" : "#22c55e"} />
+            <Cell key={i} fill={d.negative ? "#FF253E" : "#22C55E"} />
           ))}
         </Bar>
       </BarChart>
