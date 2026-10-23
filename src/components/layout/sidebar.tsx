@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   X,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/psychology", label: "Trading Psychology", icon: Brain },
+  { href: "/coach", label: "AI Coach", icon: Sparkles },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
