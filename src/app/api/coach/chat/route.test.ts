@@ -7,12 +7,19 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/repository/accounts", () => ({
   listAccounts: vi.fn(),
 }));
+vi.mock("@/lib/repository/coach", () => ({
+  getConversation: vi.fn(),
+  listRecentMessages: vi.fn(),
+  createConversationWithTurn: vi.fn(),
+  appendTurn: vi.fn(),
+}));
 vi.mock("@/lib/ai/coach-chat", () => ({
   runCoachChat: vi.fn(),
 }));
 
 import { createClient, requireUser } from "@/lib/supabase/server";
 import { listAccounts } from "@/lib/repository/accounts";
+import { getConversation, listRecentMessages, createConversationWithTurn, appendTurn } from "@/lib/repository/coach";
 import { runCoachChat } from "@/lib/ai/coach-chat";
 import { POST } from "./route";
 
@@ -25,6 +32,8 @@ const ACCOUNT = {
   isDefault: true,
   createdAt: "2026-01-01T00:00:00.000Z",
 };
+
+const REPLY = { reply: "Your win rate is 50%.", usage: { inputTokens: 100, outputTokens: 50, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 } };
 
 function makeQueryChain(result: { count?: number | null; error?: unknown }) {
   const chain: Record<string, unknown> = {};
@@ -73,7 +82,12 @@ beforeEach(() => {
   vi.mocked(requireUser).mockReset();
   vi.mocked(listAccounts).mockReset();
   vi.mocked(runCoachChat).mockReset();
+  vi.mocked(getConversation).mockReset();
+  vi.mocked(listRecentMessages).mockReset();
+  vi.mocked(createConversationWithTurn).mockReset();
+  vi.mocked(appendTurn).mockReset();
   vi.mocked(listAccounts).mockResolvedValue([ACCOUNT]);
+  vi.mocked(createConversationWithTurn).mockResolvedValue({ id: "conv-new", accountId: "acc-1", title: "t", createdAt: "x", updatedAt: "x" });
 });
 
 describe("POST /api/coach/chat — authentication", () => {
@@ -97,18 +111,57 @@ describe("POST /api/coach/chat — account isolation", () => {
     expect(runCoachChat).not.toHaveBeenCalled();
   });
 
-  it("proceeds when the accountId belongs to the user", async () => {
+  it("proceeds when the accountId belongs to the user, and starts a new persisted conversation", async () => {
     vi.mocked(createClient).mockResolvedValue(makeSupabase({}) as never);
     vi.mocked(requireUser).mockResolvedValue({ id: "user-1" } as never);
-    vi.mocked(runCoachChat).mockResolvedValue({
-      reply: "Your win rate is 50%.",
-      usage: { inputTokens: 100, outputTokens: 50, cacheCreationInputTokens: 0, cacheReadInputTokens: 0 },
-    });
+    vi.mocked(runCoachChat).mockResolvedValue(REPLY);
 
     const res = await POST(makeRequest({ message: "what is my win rate?", accountId: "acc-1" }));
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.reply).toBe("Your win rate is 50%.");
+    expect(json.conversationId).toBe("conv-new");
+    expect(createConversationWithTurn).toHaveBeenCalledWith("acc-1", expect.any(String), "what is my win rate?", "Your win rate is 50%.");
+    expect(appendTurn).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/coach/chat — conversation isolation", () => {
+  it("returns 400 and never calls Claude for a conversationId the user does not own", async () => {
+    vi.mocked(createClient).mockResolvedValue(makeSupabase({}) as never);
+    vi.mocked(requireUser).mockResolvedValue({ id: "user-1" } as never);
+    vi.mocked(getConversation).mockResolvedValue(null);
+
+    const res = await POST(makeRequest({ message: "hi", accountId: "acc-1", conversationId: "someone-elses-conversation" }));
+    expect(res.status).toBe(400);
+    expect(runCoachChat).not.toHaveBeenCalled();
+  });
+
+  it("loads prior history and appends to the existing conversation on success", async () => {
+    vi.mocked(createClient).mockResolvedValue(makeSupabase({}) as never);
+    vi.mocked(requireUser).mockResolvedValue({ id: "user-1" } as never);
+    vi.mocked(getConversation).mockResolvedValue({ id: "conv-1", accountId: "acc-1", title: "t", createdAt: "x", updatedAt: "x" });
+    vi.mocked(listRecentMessages).mockResolvedValue([
+      { id: "m1", conversationId: "conv-1", role: "user", content: "earlier question", createdAt: "x" },
+      { id: "m2", conversationId: "conv-1", role: "assistant", content: "earlier answer", createdAt: "x" },
+    ]);
+    vi.mocked(runCoachChat).mockResolvedValue(REPLY);
+
+    const res = await POST(makeRequest({ message: "follow up", accountId: "acc-1", conversationId: "conv-1" }));
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.conversationId).toBe("conv-1");
+
+    expect(runCoachChat).toHaveBeenCalledWith(
+      "follow up",
+      expect.anything(),
+      [
+        { role: "user", content: "earlier question" },
+        { role: "assistant", content: "earlier answer" },
+      ]
+    );
+    expect(appendTurn).toHaveBeenCalledWith("conv-1", "follow up", "Your win rate is 50%.");
+    expect(createConversationWithTurn).not.toHaveBeenCalled();
   });
 });
 
@@ -133,7 +186,7 @@ describe("POST /api/coach/chat — budget controls", () => {
 });
 
 describe("POST /api/coach/chat — error handling", () => {
-  it("returns a safe 500 and still reconciles the reservation (actual=0) when the AI call throws", async () => {
+  it("returns a safe 500, still reconciles (actual=0), and persists nothing when the AI call throws", async () => {
     const supabase = makeSupabase({});
     vi.mocked(createClient).mockResolvedValue(supabase as never);
     vi.mocked(requireUser).mockResolvedValue({ id: "user-1" } as never);
@@ -146,6 +199,8 @@ describe("POST /api/coach/chat — error handling", () => {
 
     const reconcileCall = supabase.rpc.mock.calls.find((c) => c[0] === "reconcile_ai_spend");
     expect(reconcileCall?.[1]).toMatchObject({ p_log_id: "log-1", p_actual_usd: 0 });
+    expect(createConversationWithTurn).not.toHaveBeenCalled();
+    expect(appendTurn).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid request body before touching the database", async () => {

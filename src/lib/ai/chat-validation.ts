@@ -4,6 +4,8 @@ export interface ChatRequestBody {
   message: string;
   accountId: string | null;
   aggregated: boolean;
+  /** null/omitted = start a new conversation. */
+  conversationId: string | null;
 }
 
 export type ValidationResult = { ok: true; body: ChatRequestBody } | { ok: false; error: string };
@@ -34,12 +36,17 @@ export function validateChatRequest(body: unknown): ValidationResult {
     }
   }
 
+  if (b.conversationId !== undefined && b.conversationId !== null && typeof b.conversationId !== "string") {
+    return { ok: false, error: "conversationId must be a string or null." };
+  }
+
   return {
     ok: true,
     body: {
       message: b.message.trim(),
       accountId: typeof b.accountId === "string" ? b.accountId : null,
       aggregated,
+      conversationId: typeof b.conversationId === "string" && b.conversationId.length > 0 ? b.conversationId : null,
     },
   };
 }

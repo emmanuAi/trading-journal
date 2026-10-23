@@ -49,13 +49,23 @@ function extractText(content: Anthropic.ContentBlock[]): string {
     .trim();
 }
 
-/** Runs the tool-use loop for one user turn. Stateless (Phase 3 MVP — no
- * persisted history yet; Phase 4 adds coach_conversations/coach_messages).
- * Scope is fixed for the whole loop via `scope`/coach-tools' closure, so no
- * tool call in any iteration can touch another account. */
-export async function runCoachChat(userMessage: string, scope: CoachScope): Promise<CoachChatResult> {
+export interface CoachHistoryTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/** Runs the tool-use loop for one user turn, optionally seeded with prior
+ * conversation history (Phase 4 — already capped to the last ~20 messages
+ * by the repository layer, so the full cap-and-fetch policy lives in one
+ * place). Scope is fixed for the whole loop via `scope`/coach-tools'
+ * closure, so no tool call in any iteration — in this turn or a replayed
+ * past one — can touch another account. */
+export async function runCoachChat(userMessage: string, scope: CoachScope, history: CoachHistoryTurn[] = []): Promise<CoachChatResult> {
   const usage = emptyUsage();
-  const messages: Anthropic.MessageParam[] = [{ role: "user", content: userMessage }];
+  const messages: Anthropic.MessageParam[] = [
+    ...history.map((h): Anthropic.MessageParam => ({ role: h.role, content: h.content })),
+    { role: "user", content: userMessage },
+  ];
 
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
     const response = await anthropic.messages.create({

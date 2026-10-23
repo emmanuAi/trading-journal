@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient, requireUser } from "@/lib/supabase/server";
 import { listAccounts } from "@/lib/repository/accounts";
+import { getConversation, listRecentMessages, createConversationWithTurn, appendTurn } from "@/lib/repository/coach";
 import { validateChatRequest } from "@/lib/ai/chat-validation";
 import { resolveAccountScope } from "@/lib/ai/scope";
 import { runCoachChat } from "@/lib/ai/coach-chat";
 import { COACH_TOOLS } from "@/lib/ai/coach-tools";
 import { COACH_MODEL, CHAT_MAX_OUTPUT_TOKENS, MAX_TOOL_ITERATIONS } from "@/lib/ai/client";
 import { estimateCallCostUsd, estimateTokensFromText, computeActualCostUsd } from "@/lib/ai/pricing";
+import { deriveConversationTitle } from "@/lib/ai/conversation-title";
 
 const DAILY_CHAT_LIMIT = 50;
 const RESERVE_CAP_USD = 1.0; // matches the DB function's own per-call ceiling
@@ -45,6 +47,19 @@ export async function POST(req: Request) {
   }
   const scope = scopeResult.scope;
 
+  // Conversation isolation: same principle as account scope — an id that
+  // isn't in this user's own conversations is rejected outright (getConversation
+  // is itself owner-scoped by RLS/repository, so a foreign id resolves to null).
+  let history: { role: "user" | "assistant"; content: string }[] = [];
+  if (validation.body.conversationId) {
+    const conversation = await getConversation(validation.body.conversationId);
+    if (!conversation) {
+      return NextResponse.json({ error: "conversationId does not belong to this user." }, { status: 400 });
+    }
+    const pastMessages = await listRecentMessages(conversation.id);
+    history = pastMessages.map((m) => ({ role: m.role, content: m.content }));
+  }
+
   // Per-owner daily rate limit (abuse protection, independent of the
   // app-wide dollar budget below).
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -64,9 +79,14 @@ export async function POST(req: Request) {
   }
 
   // Atomic monthly budget reservation — worst-case bound across every
-  // iteration of the tool-use loop (see decision 8 of the plan).
+  // iteration of the tool-use loop (see decision 8 of the plan). History
+  // messages count toward input tokens too, so they're included in the
+  // (deliberately generous) estimate.
   const estimatedInputTokens =
-    estimateTokensFromText(JSON.stringify(COACH_TOOLS)) + estimateTokensFromText(validation.body.message) + 2000;
+    estimateTokensFromText(JSON.stringify(COACH_TOOLS)) +
+    estimateTokensFromText(validation.body.message) +
+    history.reduce((sum, h) => sum + estimateTokensFromText(h.content), 0) +
+    2000;
   const estimatedCost = Math.min(
     estimateCallCostUsd(COACH_MODEL, estimatedInputTokens, CHAT_MAX_OUTPUT_TOKENS * MAX_TOOL_ITERATIONS),
     RESERVE_CAP_USD
@@ -95,7 +115,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const result = await runCoachChat(validation.body.message, scope);
+    const result = await runCoachChat(validation.body.message, scope, history);
     const actualCost = computeActualCostUsd(COACH_MODEL, {
       input_tokens: result.usage.inputTokens,
       output_tokens: result.usage.outputTokens,
@@ -103,7 +123,24 @@ export async function POST(req: Request) {
       cache_read_input_tokens: result.usage.cacheReadInputTokens,
     });
     await reconcile(actualCost);
-    return NextResponse.json({ reply: result.reply });
+
+    // Persist only on success — a failed turn leaves no partial trace,
+    // matching what the UI already shows (it rolls back the optimistic
+    // user bubble on error).
+    let conversationId = validation.body.conversationId;
+    if (conversationId) {
+      await appendTurn(conversationId, validation.body.message, result.reply);
+    } else {
+      const created = await createConversationWithTurn(
+        scope.aggregated ? null : scope.accountId,
+        deriveConversationTitle(validation.body.message),
+        validation.body.message,
+        result.reply
+      );
+      conversationId = created.id;
+    }
+
+    return NextResponse.json({ reply: result.reply, conversationId });
   } catch (err) {
     await reconcile(0);
     // Never log the request/response bodies or any header — just enough to
