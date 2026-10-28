@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ChatMarkdown } from "@/components/coach/chat-markdown";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -229,11 +230,11 @@ export default function CoachPage() {
                       )}
                       <div
                         className={cn(
-                          "max-w-[75%] rounded-xl px-4 py-2.5 text-sm whitespace-pre-wrap",
-                          m.role === "user" ? "bg-accent text-accent-foreground" : "bg-surface-2 text-foreground"
+                          "max-w-[75%] rounded-xl px-4 py-2.5",
+                          m.role === "user" ? "bg-accent text-accent-foreground text-sm whitespace-pre-wrap" : "bg-surface-2 text-foreground"
                         )}
                       >
-                        {m.content}
+                        {m.role === "assistant" ? <ChatMarkdown content={m.content} /> : m.content}
                       </div>
                       {m.role === "user" && (
                         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2">
