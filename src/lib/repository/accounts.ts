@@ -1,7 +1,7 @@
 import { createClient, requireUser } from "../supabase/server";
 import type { Account, AccountType } from "../types";
 
-interface AccountRow {
+export interface AccountRow {
   id: string;
   name: string;
   type: string;
@@ -11,7 +11,7 @@ interface AccountRow {
   created_at: string;
 }
 
-function rowToAccount(row: AccountRow): Account {
+export function rowToAccount(row: AccountRow): Account {
   return {
     id: row.id,
     name: row.name,

@@ -157,6 +157,7 @@ beforeEach(() => {
     strategies: [],
     customTags: [],
     showDemoData: true,
+    autoWeeklyReportsEnabled: false,
   });
   vi.mocked(requireUser).mockResolvedValue({ id: "user-1" } as never);
   vi.mocked(insertReport).mockResolvedValue(SAVED_REPORT as never);

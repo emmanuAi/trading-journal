@@ -99,6 +99,20 @@ export function SettingsClient({ initialFirstName, initialLastName }: { initialF
     }
   }
 
+  async function toggleAutoWeeklyReports(enabled: boolean) {
+    const res = await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ autoWeeklyReportsEnabled: enabled }),
+    });
+    if (res.ok) {
+      toast.success(enabled ? "Automated weekly reports enabled." : "Automated weekly reports disabled.");
+      refresh();
+    } else {
+      toast.error("Failed to update automated reports preference.");
+    }
+  }
+
   async function clearDemo() {
     await fetch("/api/settings", { method: "DELETE" });
     toast.success("Demo trades removed.");
@@ -384,6 +398,21 @@ export function SettingsClient({ initialFirstName, initialLastName }: { initialF
             <Button variant="destructive" size="sm" onClick={() => setClearDemoOpen(true)}>
               <Trash2 className="h-3.5 w-3.5" /> Clear Demo Data
             </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-foreground text-base font-semibold">AI Coach</CardTitle>
+            <CardDescription>
+              When on, an automated weekly report is generated for you every week you have closed trades — across all your
+              accounts combined. Off by default; counts against the same shared AI budget as the Coach chat and on-demand
+              reports.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex items-center gap-3">
+            <Switch checked={settings?.autoWeeklyReportsEnabled ?? false} onCheckedChange={toggleAutoWeeklyReports} />
+            <span className="text-sm">Automatically generate a weekly AI report</span>
           </CardContent>
         </Card>
 

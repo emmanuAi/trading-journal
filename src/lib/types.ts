@@ -109,6 +109,9 @@ export interface Settings {
   strategies: string[];
   customTags: string[];
   showDemoData: boolean;
+  /** Opt-in for Phase 6 automated weekly AI reports — defaults to false for
+   * every user (new and existing) until they explicitly turn it on. */
+  autoWeeklyReportsEnabled: boolean;
 }
 
 export interface WeeklyReview {

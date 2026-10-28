@@ -20,7 +20,7 @@ import type {
 import { listScreenshotsForTrade, listScreenshotsForTrades } from "./screenshots";
 import { getAccount } from "./accounts";
 
-interface TradeRow {
+export interface TradeRow {
   id: string;
   account_id: string;
   is_demo: boolean;
@@ -57,7 +57,7 @@ interface TradeRow {
   updated_at: string;
 }
 
-function rowToTrade(row: TradeRow): Trade {
+export function rowToTrade(row: TradeRow): Trade {
   return {
     id: row.id,
     accountId: row.account_id,

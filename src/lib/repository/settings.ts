@@ -1,7 +1,7 @@
 import { createClient, requireUser } from "../supabase/server";
 import type { Settings } from "../types";
 
-interface SettingsRow {
+export interface SettingsRow {
   base_currency: string;
   timezone: string;
   default_account_id: string | null;
@@ -9,11 +9,12 @@ interface SettingsRow {
   strategies: string[];
   custom_tags: string[];
   show_demo_data: boolean;
+  auto_weekly_reports_enabled: boolean;
 }
 
 const DEFAULT_STRATEGIES = ["Breakout", "Trend Continuation", "Reversal", "Range Play", "News Trade"];
 
-function rowToSettings(row: SettingsRow): Settings {
+export function rowToSettings(row: SettingsRow): Settings {
   return {
     baseCurrency: row.base_currency,
     timezone: row.timezone,
@@ -22,6 +23,7 @@ function rowToSettings(row: SettingsRow): Settings {
     strategies: row.strategies ?? [],
     customTags: row.custom_tags ?? [],
     showDemoData: row.show_demo_data,
+    autoWeeklyReportsEnabled: row.auto_weekly_reports_enabled ?? false,
   };
 }
 
@@ -34,6 +36,9 @@ export async function getSettings(): Promise<Settings> {
   if (data) return rowToSettings(data as SettingsRow);
 
   // First request for this owner — create their default settings row.
+  // auto_weekly_reports_enabled is deliberately omitted here so the
+  // column's own `default false` is what applies — one single source of
+  // truth for "off by default", not duplicated in application code.
   const { data: created, error: insertError } = await supabase
     .from("settings")
     .insert({
@@ -68,6 +73,7 @@ export async function updateSettings(input: Partial<Settings>): Promise<Settings
       strategies: next.strategies,
       custom_tags: next.customTags,
       show_demo_data: next.showDemoData,
+      auto_weekly_reports_enabled: next.autoWeeklyReportsEnabled,
     })
     .eq("owner", user.id)
     .select()

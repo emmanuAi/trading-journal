@@ -48,5 +48,6 @@ export interface WeeklyReportSummary {
   summaryText: string;
   modelUsed: string;
   tradesCount: number;
+  source: "manual" | "scheduled";
   createdAt: string;
 }
