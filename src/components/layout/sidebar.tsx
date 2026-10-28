@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   Sparkles,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/psychology", label: "Trading Psychology", icon: Brain },
   { href: "/coach", label: "AI Coach", icon: Sparkles },
+  { href: "/reports", label: "Weekly Reports", icon: FileText },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
